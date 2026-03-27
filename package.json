@@ -1,19 +1,30 @@
 {
   "author": "School for Professionals",
   "bin": {
-    "sfp-images": "dist/cli.mjs"
+    "sfp-image": "dist/cli.mjs"
   },
   "bugs": {
     "url": "https://github.com/schoolforprofessionals/sfp-images/issues"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "commander": "^14.0.3",
+    "opentype.js": "^1.3.4",
+    "react": "^19.2.4",
+    "satori": "^0.26.0"
+  },
   "description": "CLI and library for generating branded images for School for Professionals sites from structured input.",
   "devDependencies": {
     "@biomejs/biome": "2.4.6",
     "@changesets/cli": "^2.29.8",
     "@intellectronica/ruler": "^0.3.34",
     "@types/bun": "1.3.11",
+    "@types/opentype.js": "^1.3.9",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^19.2.14",
+    "pixelmatch": "^7.1.0",
     "pkg-pr-new": "^0.0.62",
+    "pngjs": "^7.0.0",
     "publint": "^0.3.16",
     "tsdown": "^0.20.3"
   },
@@ -30,6 +41,7 @@
     }
   },
   "files": [
+    "assets",
     "dist"
   ],
   "homepage": "https://github.com/schoolforprofessionals/sfp-images#readme",
@@ -60,6 +72,7 @@
     "changeset": "changeset",
     "check-types": "tsc -b --noEmit",
     "ci": "bun run build && bun run lint && bun run check-types && bun test",
+    "dev": "bun run ./src/cli.ts",
     "lint": "biome check --error-on-warnings",
     "lint:fix": "biome check --error-on-warnings --write",
     "release": "changeset publish",
