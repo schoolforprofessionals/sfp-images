@@ -1,12 +1,15 @@
 #!/usr/bin/env bun
 
 import { Command } from 'commander'
+import { registerApiCommand } from './cli/command-api.ts'
 import { registerGenerateTipsCommand } from './cli/command-generate-tips.ts'
 
 export function createProgram(): Command {
   const program = new Command()
 
   program.name('sfp-image').description('Generate branded School for Professionals images from structured input.')
+
+  registerApiCommand(program)
   registerGenerateTipsCommand(program)
 
   return program

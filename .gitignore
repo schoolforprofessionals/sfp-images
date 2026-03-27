@@ -1,6 +1,6 @@
-/tmp
-
 *.tsbuildinfo
+.wrangler
+/tmp
 dist
 node_modules
 

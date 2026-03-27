@@ -36,6 +36,36 @@ Command rules:
 - titles stay on one line and shrink when needed
 - the CLI uses the vendored `Archivo Black` font under `assets/fonts/`
 
+## API
+
+The repository also includes a local Hono API for image generation and OpenAPI-based tooling.
+
+Local development and Docker still use the Bun adapter. Cloudflare Workers uses the separate entrypoint in `src/api-worker.ts` via `wrangler.jsonc`.
+
+Start it with:
+
+```bash
+bun dev api
+```
+
+If port `3000` is already in use, override it with `PORT`:
+
+```bash
+PORT=3100 bun dev api
+```
+
+Useful local URLs:
+
+- docs UI: [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
+- example image URL: [http://localhost:3000/api/generate-tips?label=sfp&title=Een%20presentatie%20geven%20in%205%20stappen&tip=Formuleer%20je%20kernboodschap&tip=Structureer%20je%20verhaal&tip=Ontwerp%20je%20slides&tip=Oefen%20voor%20een%20bekende&tip=Pas%20presentatietechnieken%20toe](http://localhost:3000/api/generate-tips?label=sfp&title=Een%20presentatie%20geven%20in%205%20stappen&tip=Formuleer%20je%20kernboodschap&tip=Structureer%20je%20verhaal&tip=Ontwerp%20je%20slides&tip=Oefen%20voor%20een%20bekende&tip=Pas%20presentatietechnieken%20toe)
+- OpenAPI JSON: [http://localhost:3000/api/openapi.json](http://localhost:3000/api/openapi.json)
+
+The `generate-tips` endpoint accepts the CLI-style query params except `output`:
+
+- `label`
+- repeated `tip`
+- `title`
+
 ## Repository Metadata
 
 - Bugs: [https://github.com/schoolforprofessionals/sfp-images/issues](https://github.com/schoolforprofessionals/sfp-images/issues)
@@ -60,8 +90,9 @@ bun run build
 bun run check-types
 bun run lint
 bun run lint:fix
-bun run test:watch
 bun test
+bun run test:watch
+bun run test:worker
 ```
 
 Reference fixtures live under `test/fixtures/generate-tips/`. Committed reference PNGs use the `*.reference.png` suffix. Running `bun test` regenerates sibling `*.generated.png` and `*.diff.png` artifacts beside those references and fails only if a committed reference becomes identical to the generated output, which usually means the original reference was overwritten with a generated copy.

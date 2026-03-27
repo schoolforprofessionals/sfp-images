@@ -1,65 +1,13 @@
-import { existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { Resvg } from '@resvg/resvg-js'
-import { type Font, parse } from 'opentype.js'
-import satori from 'satori'
-import { type GenerateTipsLabel, getLabelConfig } from '../labels.ts'
+import type { Font as OpenTypeFont } from 'opentype.js'
+import type * as React from 'react'
+import type { Label } from '../labels.ts'
+import type { GenerateRuntime, GenerateRuntimeSvgRendererOptions } from './generate-runtime.ts'
+import type { GenerateTipsCoreConfig } from './generate-tips-config.ts'
 
-const FONT_STYLE = 'normal'
-const FONT_WEIGHT = 400
-const IMAGE_FONT_SOURCE_FILE_NAME = 'ArchivoBlack-Regular.ttf'
-const IMAGE_FONT_SOURCE_PATH_SEGMENTS = ['assets', 'fonts', IMAGE_FONT_SOURCE_FILE_NAME] as const
-const PACKAGE_MANIFEST_FILE_NAME = 'package.json'
+const FONT_STYLE = 'normal' as const
+const FONT_WEIGHT = 400 as const
 const MAX_TIP_COUNT = 7
 const MIN_TIP_COUNT = 3
-
-function resolveImageFontSourcePath(): string {
-  let directoryPath = dirname(fileURLToPath(import.meta.url))
-
-  while (true) {
-    const candidatePath = join(directoryPath, ...IMAGE_FONT_SOURCE_PATH_SEGMENTS)
-
-    if (existsSync(candidatePath)) {
-      return candidatePath
-    }
-
-    const parentDirectoryPath = dirname(directoryPath)
-
-    if (parentDirectoryPath === directoryPath || existsSync(join(directoryPath, PACKAGE_MANIFEST_FILE_NAME))) {
-      break
-    }
-
-    directoryPath = parentDirectoryPath
-  }
-
-  throw new Error(`Could not locate ${IMAGE_FONT_SOURCE_FILE_NAME}.`)
-}
-
-export const ImageConfig = {
-  font: {
-    family: 'Archivo Black',
-    sourcePath: resolveImageFontSourcePath(),
-  },
-  image: {
-    height: 432,
-    width: 768,
-  },
-  layout: {
-    barBadgeGap: 11,
-    barBadgeOffsetLeft: 3,
-    barBorderWidth: 1,
-    barMaxWidth: 560,
-    barRadius: 0,
-    tipLineHeight: 1,
-    tipTextPaddingRight: 17,
-    titleFontSizeMax: 28,
-    titleFontSizeMin: 14,
-    titleLineHeight: 1.05,
-    titleMaxWidth: 728,
-    titleTopPadding: 44,
-  },
-} as const
 
 const COUNT_LAYOUT_PRESETS = {
   3: {
@@ -101,11 +49,6 @@ const COUNT_LAYOUT_PRESETS = {
 
 type SupportedTipCount = keyof typeof COUNT_LAYOUT_PRESETS
 
-type LoadedFont = {
-  bytes: ArrayBuffer
-  font: Font
-}
-
 export type GenerateTipsBarLayout = {
   number: string
   text: string
@@ -113,7 +56,7 @@ export type GenerateTipsBarLayout = {
 }
 
 export type GenerateTipsImageInput = {
-  label: GenerateTipsLabel
+  label: Label
   title: string
   tips: string[]
 }
@@ -131,7 +74,9 @@ export type GenerateTipsLayout = {
   titleToBarsGap: number
 }
 
-let loadedFontPromise: Promise<LoadedFont> | undefined
+export type GenerateTipsRuntime = GenerateRuntime & {
+  config: GenerateTipsCoreConfig
+}
 
 function collapseWhitespace(value: string): string {
   return value.trim().replace(/\s+/g, ' ')
@@ -149,13 +94,14 @@ function normalizeGenerateTipsImageInput(input: GenerateTipsImageInput): Generat
   }
 }
 
-function measureTextWidth(font: Font, text: string, fontSize: number): number {
+function measureTextWidth(font: OpenTypeFont, text: string, fontSize: number): number {
   return font.getAdvanceWidth(text, fontSize)
 }
 
 function createTitleLayout(
+  config: GenerateTipsCoreConfig,
   input: GenerateTipsImageInput,
-  font: Font,
+  font: OpenTypeFont,
 ): {
   fontSize: number
   lines: string[]
@@ -164,12 +110,8 @@ function createTitleLayout(
     throw new Error('Title is required.')
   }
 
-  for (
-    let fontSize = ImageConfig.layout.titleFontSizeMax;
-    fontSize >= ImageConfig.layout.titleFontSizeMin;
-    fontSize -= 1
-  ) {
-    if (measureTextWidth(font, input.title, fontSize) <= ImageConfig.layout.titleMaxWidth) {
+  for (let fontSize = config.layout.titleFontSizeMax; fontSize >= config.layout.titleFontSizeMin; fontSize -= 1) {
+    if (measureTextWidth(font, input.title, fontSize) <= config.layout.titleMaxWidth) {
       return {
         fontSize,
         lines: [input.title],
@@ -181,18 +123,19 @@ function createTitleLayout(
 }
 
 function createTipMeasurements(
+  config: GenerateTipsCoreConfig,
   input: GenerateTipsImageInput,
   barBadgeSize: number,
-  font: Font,
+  font: OpenTypeFont,
   layoutPreset: (typeof COUNT_LAYOUT_PRESETS)[SupportedTipCount],
 ): number[] {
   const maxTextWidth =
-    ImageConfig.layout.barMaxWidth -
-    ImageConfig.layout.barBorderWidth * 2 -
-    ImageConfig.layout.barBadgeOffsetLeft -
-    ImageConfig.layout.barBadgeGap -
+    config.layout.barMaxWidth -
+    config.layout.barBorderWidth * 2 -
+    config.layout.barBadgeOffsetLeft -
+    config.layout.barBadgeGap -
     barBadgeSize -
-    ImageConfig.layout.tipTextPaddingRight
+    config.layout.tipTextPaddingRight
 
   return input.tips.map((tip) => {
     if (!tip) {
@@ -209,19 +152,6 @@ function createTipMeasurements(
   })
 }
 
-async function loadImageFont(): Promise<LoadedFont> {
-  loadedFontPromise ??= (async () => {
-    const bytes = await Bun.file(ImageConfig.font.sourcePath).arrayBuffer()
-
-    return {
-      bytes,
-      font: parse(bytes),
-    }
-  })()
-
-  return loadedFontPromise
-}
-
 function getCountLayoutPreset(tipCount: number): (typeof COUNT_LAYOUT_PRESETS)[SupportedTipCount] {
   const preset = COUNT_LAYOUT_PRESETS[tipCount as SupportedTipCount]
 
@@ -232,7 +162,11 @@ function getCountLayoutPreset(tipCount: number): (typeof COUNT_LAYOUT_PRESETS)[S
   return preset
 }
 
-function computeGenerateTipsLayoutWithFont(input: GenerateTipsImageInput, font: Font): GenerateTipsLayout {
+function computeGenerateTipsLayoutWithFont(
+  config: GenerateTipsCoreConfig,
+  input: GenerateTipsImageInput,
+  font: OpenTypeFont,
+): GenerateTipsLayout {
   const normalizedInput = normalizeGenerateTipsImageInput(input)
 
   if (normalizedInput.tips.length < MIN_TIP_COUNT || normalizedInput.tips.length > MAX_TIP_COUNT) {
@@ -242,18 +176,18 @@ function computeGenerateTipsLayoutWithFont(input: GenerateTipsImageInput, font: 
   const layoutPreset = getCountLayoutPreset(normalizedInput.tips.length)
   const barBadgeSize = Math.max(
     0,
-    layoutPreset.barHeight - ImageConfig.layout.barBorderWidth * 2 - ImageConfig.layout.barBadgeOffsetLeft * 2,
+    layoutPreset.barHeight - config.layout.barBorderWidth * 2 - config.layout.barBadgeOffsetLeft * 2,
   )
-  const titleLayout = createTitleLayout(normalizedInput, font)
-  const tipWidths = createTipMeasurements(normalizedInput, barBadgeSize, font, layoutPreset)
+  const titleLayout = createTitleLayout(config, normalizedInput, font)
+  const tipWidths = createTipMeasurements(config, normalizedInput, barBadgeSize, font, layoutPreset)
   const rawBarWidth =
     Math.max(...tipWidths) +
-    ImageConfig.layout.barBorderWidth * 2 +
-    ImageConfig.layout.barBadgeOffsetLeft +
+    config.layout.barBorderWidth * 2 +
+    config.layout.barBadgeOffsetLeft +
     barBadgeSize +
-    ImageConfig.layout.barBadgeGap +
-    ImageConfig.layout.tipTextPaddingRight
-  const barWidth = Math.min(ImageConfig.layout.barMaxWidth, Math.max(layoutPreset.barMinWidth, Math.ceil(rawBarWidth)))
+    config.layout.barBadgeGap +
+    config.layout.tipTextPaddingRight
+  const barWidth = Math.min(config.layout.barMaxWidth, Math.max(layoutPreset.barMinWidth, Math.ceil(rawBarWidth)))
   const numberFontSize = Math.max(14, Math.round(barBadgeSize * 0.68))
   const bars = normalizedInput.tips.map((tip, index) => ({
     number: String(index + 1),
@@ -275,16 +209,35 @@ function computeGenerateTipsLayoutWithFont(input: GenerateTipsImageInput, font: 
   }
 }
 
-export async function computeGenerateTipsLayout(input: GenerateTipsImageInput): Promise<GenerateTipsLayout> {
-  const { font } = await loadImageFont()
+export async function computeGenerateTipsLayoutWithRuntime(
+  input: GenerateTipsImageInput,
+  runtime: Pick<GenerateTipsRuntime, 'config' | 'loadFont'>,
+): Promise<GenerateTipsLayout> {
+  const { font } = await runtime.loadFont()
 
-  return computeGenerateTipsLayoutWithFont(input, font)
+  return computeGenerateTipsLayoutWithFont(runtime.config, input, font)
 }
 
-export async function generateTipsSvg(input: GenerateTipsImageInput): Promise<string> {
-  const { bytes, font } = await loadImageFont()
-  const colors = getLabelConfig(input.label).colors
-  const layout = computeGenerateTipsLayoutWithFont(input, font)
+function generateTipsSvgOptions({
+  bytes,
+  config,
+}: {
+  bytes: ArrayBuffer
+  config: GenerateTipsCoreConfig
+}): GenerateRuntimeSvgRendererOptions {
+  return {
+    fonts: [{ data: bytes, name: config.font.family, style: FONT_STYLE, weight: FONT_WEIGHT }],
+    height: config.image.height,
+    width: config.image.width,
+  }
+}
+function generateTipsSvgElement({
+  config,
+  layout,
+}: {
+  config: GenerateTipsCoreConfig
+  layout: GenerateTipsLayout
+}): React.ReactNode {
   const titleLineEntries = layout.titleLines.map<{
     isOffset: boolean
     key: string
@@ -297,9 +250,9 @@ export async function generateTipsSvg(input: GenerateTipsImageInput): Promise<st
   const styles = {
     bar: {
       alignItems: 'center',
-      backgroundColor: colors.backgroundBar,
-      border: `${ImageConfig.layout.barBorderWidth}px solid ${colors.colorTitle}`,
-      borderRadius: ImageConfig.layout.barRadius,
+      backgroundColor: config.colors.backgroundBar,
+      border: `${config.layout.barBorderWidth}px solid ${config.colors.colorTitle}`,
+      borderRadius: config.layout.barRadius,
       boxSizing: 'border-box',
       display: 'flex',
       flexDirection: 'row',
@@ -313,7 +266,7 @@ export async function generateTipsSvg(input: GenerateTipsImageInput): Promise<st
       display: 'flex',
       flex: 1,
       justifyContent: 'flex-start',
-      paddingRight: ImageConfig.layout.tipTextPaddingRight,
+      paddingRight: config.layout.tipTextPaddingRight,
     },
     barsArea: {
       alignItems: 'center',
@@ -322,7 +275,7 @@ export async function generateTipsSvg(input: GenerateTipsImageInput): Promise<st
       flexDirection: 'column',
       justifyContent: 'flex-start',
       marginTop: layout.titleToBarsGap,
-      width: ImageConfig.image.width,
+      width: config.image.width,
     },
     barsFrame: {
       alignItems: 'center',
@@ -334,29 +287,29 @@ export async function generateTipsSvg(input: GenerateTipsImageInput): Promise<st
     },
     canvas: {
       alignItems: 'center',
-      backgroundColor: colors.background,
+      backgroundColor: config.colors.background,
       boxSizing: 'border-box',
       display: 'flex',
       flexDirection: 'column',
-      height: ImageConfig.image.height,
-      width: ImageConfig.image.width,
+      height: config.image.height,
+      width: config.image.width,
     },
     numberBadge: {
       alignItems: 'center',
-      backgroundColor: colors.backgroundNumber,
-      color: colors.colorTitle,
+      backgroundColor: config.colors.backgroundNumber,
+      color: config.colors.colorTitle,
       display: 'flex',
       fontSize: layout.numberFontSize,
       fontWeight: FONT_WEIGHT,
       height: layout.barBadgeSize,
       justifyContent: 'center',
-      marginLeft: ImageConfig.layout.barBadgeOffsetLeft,
+      marginLeft: config.layout.barBadgeOffsetLeft,
       width: layout.barBadgeSize,
     },
     tipText: {
-      color: colors.colorText,
+      color: config.colors.colorText,
       fontSize: layout.tipFontSize,
-      lineHeight: `${Math.ceil(layout.tipFontSize * ImageConfig.layout.tipLineHeight)}px`,
+      lineHeight: `${Math.ceil(layout.tipFontSize * config.layout.tipLineHeight)}px`,
       textAlign: 'left',
       whiteSpace: 'nowrap',
       width: '100%',
@@ -364,17 +317,17 @@ export async function generateTipsSvg(input: GenerateTipsImageInput): Promise<st
     title: {
       alignItems: 'center',
       boxSizing: 'border-box',
-      color: colors.colorTitle,
+      color: config.colors.colorTitle,
       display: 'flex',
       flexDirection: 'column',
       fontSize: layout.titleFontSize,
       fontWeight: FONT_WEIGHT,
       justifyContent: 'center',
-      lineHeight: `${Math.ceil(layout.titleFontSize * ImageConfig.layout.titleLineHeight)}px`,
-      marginTop: ImageConfig.layout.titleTopPadding,
-      maxWidth: ImageConfig.layout.titleMaxWidth,
+      lineHeight: `${Math.ceil(layout.titleFontSize * config.layout.titleLineHeight)}px`,
+      marginTop: config.layout.titleTopPadding,
+      maxWidth: config.layout.titleMaxWidth,
       textAlign: 'center',
-      width: ImageConfig.layout.titleMaxWidth,
+      width: config.layout.titleMaxWidth,
     },
     titleLine: {
       display: 'flex',
@@ -392,7 +345,7 @@ export async function generateTipsSvg(input: GenerateTipsImageInput): Promise<st
     },
   } as const
 
-  return satori(
+  return (
     <div style={styles.canvas}>
       <div style={styles.title}>
         {titleLineEntries.map((entry) => (
@@ -416,7 +369,7 @@ export async function generateTipsSvg(input: GenerateTipsImageInput): Promise<st
                 <div
                   style={{
                     ...styles.tipText,
-                    marginLeft: ImageConfig.layout.barBadgeGap,
+                    marginLeft: config.layout.barBadgeGap,
                   }}
                 >
                   {bar.text}
@@ -426,25 +379,29 @@ export async function generateTipsSvg(input: GenerateTipsImageInput): Promise<st
           ))}
         </div>
       </div>
-    </div>,
-    {
-      fonts: [
-        {
-          data: bytes,
-          name: ImageConfig.font.family,
-          style: FONT_STYLE,
-          weight: FONT_WEIGHT,
-        },
-      ],
-      height: ImageConfig.image.height,
-      width: ImageConfig.image.width,
-    },
+    </div>
   )
 }
 
-export async function generateTipsImage(input: GenerateTipsImageInput): Promise<Uint8Array> {
-  const svg = await generateTipsSvg(input)
-  const resvg = new Resvg(svg)
+export async function generateTipsSvgWithRuntime(
+  input: GenerateTipsImageInput,
+  runtime: Pick<GenerateTipsRuntime, 'config' | 'loadFont' | 'renderSvg'>,
+): Promise<string> {
+  const { bytes, font } = await runtime.loadFont()
+  const { config } = runtime
+  const layout = computeGenerateTipsLayoutWithFont(config, input, font)
 
-  return resvg.render().asPng()
+  const element = generateTipsSvgElement({ config, layout })
+  const options = generateTipsSvgOptions({ bytes, config })
+
+  return runtime.renderSvg(element, options)
+}
+
+export async function generateTipsImageWithRuntime(
+  input: GenerateTipsImageInput,
+  runtime: GenerateTipsRuntime,
+): Promise<Uint8Array> {
+  const svg = await generateTipsSvgWithRuntime(input, runtime)
+
+  return runtime.renderPng(svg)
 }

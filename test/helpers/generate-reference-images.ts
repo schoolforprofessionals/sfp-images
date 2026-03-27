@@ -1,7 +1,7 @@
 import { access, mkdir } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
-import { type GenerateTipsLabel, getLabelConfig } from '../../src/labels.ts'
-import { type GenerateTipsImageInput, generateTipsImage } from '../../src/lib/generate-tips.tsx'
+import { type GenerateTipsImageInput, generateTipsImage } from '../../src/index.ts'
+import { getLabelConfig, type Label } from '../../src/labels.ts'
 
 const referenceImageSuffix = '.reference.png'
 
@@ -11,7 +11,7 @@ export type GenerateTipsReferenceFixture = {
   title: string
 }
 
-export type GenerateTipsReferenceFixtures = Partial<Record<GenerateTipsLabel, readonly GenerateTipsReferenceFixture[]>>
+export type GenerateTipsReferenceFixtures = Partial<Record<Label, readonly GenerateTipsReferenceFixture[]>>
 
 export type GenerateTipsReferenceEntry = GenerateTipsImageInput & {
   diffPath: string
@@ -23,7 +23,7 @@ export type GenerateTipsReferenceEntry = GenerateTipsImageInput & {
 function createGenerateTipsReferenceEntry(
   fixture: GenerateTipsReferenceFixture,
   fixturesDirectoryPath: string,
-  label: GenerateTipsLabel,
+  label: Label,
 ): GenerateTipsReferenceEntry {
   if (!fixture.referenceFileName) {
     throw new Error(`Reference entry for label "${label}" must define a reference image filename.`)
@@ -73,7 +73,7 @@ export async function resolveGenerateTipsReferenceEntries(
   fixturesDirectoryPath: string,
 ): Promise<GenerateTipsReferenceEntry[]> {
   const entries: GenerateTipsReferenceEntry[] = []
-  const labels = Object.keys(fixtures).sort() as GenerateTipsLabel[]
+  const labels = Object.keys(fixtures).sort() as Label[]
 
   for (const label of labels) {
     getLabelConfig(label)

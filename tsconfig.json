@@ -14,11 +14,12 @@
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
     "target": "ESNext",
     "verbatimModuleSyntax": true
   },
   "exclude": ["dist", "node_modules"],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "tsdown.config.ts"]
+  "include": ["scripts/**/*.ts", "src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "tsdown.config.ts"]
 }

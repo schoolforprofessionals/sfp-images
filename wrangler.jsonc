@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "compatibility_date": "2026-03-28",
+  "main": "src/api-worker.ts",
+  "name": "sfp-images",
+  "rules": [
+    {
+      "fallthrough": false,
+      "globs": ["**/*.ttf"],
+      "type": "Data"
+    },
+    {
+      "fallthrough": false,
+      "globs": ["**/*.wasm"],
+      "type": "CompiledWasm"
+    }
+  ]
+}

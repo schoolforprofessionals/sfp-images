@@ -9,7 +9,7 @@ import {
   type GenerateTipsImageInput,
   generateTipsImage,
   generateTipsSvg,
-  ImageConfig,
+  getGenerateTipsConfig,
 } from '../src/index.ts'
 import { generateTipsReferenceFixtures } from './fixtures/generate-tips/references.ts'
 import { type CompareImagesInput, compareImages } from './helpers/compare-images.ts'
@@ -27,6 +27,7 @@ const sampleInput: GenerateTipsImageInput = {
   tips: ['Lead with clarity', 'Keep the copy short', 'Measure real text width', 'Render once to PNG'],
   title: 'This is a way to generate images',
 }
+const generateTipsConfig = getGenerateTipsConfig(sampleInput.label)
 
 type Rgba = readonly [number, number, number, number]
 
@@ -148,8 +149,8 @@ test('computeGenerateTipsLayout keeps reference titles on one line by shrinking 
   })
 
   expect(layout.titleLines).toEqual(['MINDER ONZICHTBAAR ZIJN MET 4 ACTIES'])
-  expect(layout.titleFontSize).toBeLessThanOrEqual(ImageConfig.layout.titleFontSizeMax)
-  expect(layout.titleFontSize).toBeGreaterThanOrEqual(ImageConfig.layout.titleFontSizeMin)
+  expect(layout.titleFontSize).toBeLessThanOrEqual(generateTipsConfig.layout.titleFontSizeMax)
+  expect(layout.titleFontSize).toBeGreaterThanOrEqual(generateTipsConfig.layout.titleFontSizeMin)
 })
 
 test('computeGenerateTipsLayout rejects a title that cannot fit on one line', async () => {
@@ -300,7 +301,7 @@ test('computeGenerateTipsLayout shares one bar width across all bars', async () 
   const layout = await computeGenerateTipsLayout(sampleInput)
   const uniqueWidths = new Set(layout.bars.map((bar) => bar.width))
 
-  expect(layout.barWidth).toBeLessThanOrEqual(ImageConfig.layout.barMaxWidth)
+  expect(layout.barWidth).toBeLessThanOrEqual(generateTipsConfig.layout.barMaxWidth)
   expect(layout.barWidth).toBeGreaterThan(0)
   expect(uniqueWidths.size).toBe(1)
 })

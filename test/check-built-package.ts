@@ -1,8 +1,9 @@
 import { existsSync } from 'node:fs'
 
 const builtPackageEntryUrl = new URL('../dist/index.mjs', import.meta.url)
-const { ImageConfig } = await import(builtPackageEntryUrl.href)
+const { getGenerateTipsConfig } = await import(builtPackageEntryUrl.href)
+const generateTipsConfig = getGenerateTipsConfig('sfp')
 
-if (!existsSync(ImageConfig.font.sourcePath)) {
-  throw new Error(`Missing packaged font at ${ImageConfig.font.sourcePath}.`)
+if (!existsSync(generateTipsConfig.font.sourcePath)) {
+  throw new Error(`Missing packaged font at ${generateTipsConfig.font.sourcePath}.`)
 }
