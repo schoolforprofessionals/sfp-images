@@ -1,5 +1,6 @@
 import packageJson from '../../package.json' with { type: 'json' }
 import { generateTipsImage } from '../lib/generate-tips-worker.ts'
+import { parseCorsOrigins } from './cors.ts'
 import { createApiApp } from './create-api-app.ts'
 
 const { app } = createApiApp({
@@ -9,10 +10,16 @@ const { app } = createApiApp({
   },
 })
 
+type ApiWorkerBindings = {
+  CORS_ORIGINS?: string
+}
+
 export function createApiWorker() {
   return {
-    fetch(request: Request) {
-      return app.fetch(request)
+    fetch(request: Request, env: ApiWorkerBindings = {}) {
+      const corsOrigins = parseCorsOrigins(env.CORS_ORIGINS)
+
+      return app.fetch(request, { corsOrigins })
     },
   }
 }

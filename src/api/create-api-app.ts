@@ -1,9 +1,15 @@
 import { swaggerUI } from '@hono/swagger-ui'
 import { OpenAPIHono } from '@hono/zod-openapi'
+import { cors } from 'hono/cors'
 import type { GenerateTipsImageInput } from '../lib/generate-tips.tsx'
+import type { CorsOrigins } from './cors.ts'
 import { API_DOCS_PATH, API_OPENAPI_PATH, buildApiOpenApiDocument } from './openapi.ts'
 import { routeGenerateTips } from './route-generate-tips.ts'
 import { routeIndex } from './route-index.ts'
+
+export type ApiAppBindings = {
+  corsOrigins?: CorsOrigins
+}
 
 export type CreateApiAppOptions = {
   apiVersion: string
@@ -27,7 +33,7 @@ function isApiClientError(error: Error): boolean {
 }
 
 export function createApiApp({ apiVersion, handlers }: CreateApiAppOptions) {
-  const app = new OpenAPIHono()
+  const app = new OpenAPIHono<{ Bindings: ApiAppBindings }>()
 
   app.onError((error, context) => {
     const message = getErrorMessage(error)
@@ -43,6 +49,17 @@ export function createApiApp({ apiVersion, handlers }: CreateApiAppOptions) {
       },
       status,
     )
+  })
+
+  app.use('*', async (context, next) => {
+    const corsOrigins = context.env?.corsOrigins
+
+    if (!corsOrigins) {
+      await next()
+      return
+    }
+
+    return cors({ origin: corsOrigins })(context, next)
   })
 
   app.openapi(routeIndex.route, routeIndex.handler)

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import packageJson from '../../package.json' with { type: 'json' }
 import { generateTipsImage } from '../lib/generate-tips-node.ts'
+import { parseCorsOrigins } from './cors.ts'
 import { createApiApp } from './create-api-app.ts'
 
 const apiPortSchema = z.preprocess(
@@ -16,8 +17,12 @@ const { app } = createApiApp({
 })
 
 export function createApiNode(port: number = apiPortSchema.parse(Bun.env.PORT)) {
+  const corsOrigins = parseCorsOrigins(Bun.env.CORS_ORIGINS)
+
   return {
-    fetch: app.fetch,
+    fetch(request: Request) {
+      return app.fetch(request, { corsOrigins })
+    },
     hostname: '0.0.0.0',
     port,
   } as const

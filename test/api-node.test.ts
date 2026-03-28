@@ -1,8 +1,15 @@
 import { expect, test } from 'bun:test'
 import packageJson from '../package.json' with { type: 'json' }
+import { parseCorsOrigins } from '../src/api/cors.ts'
 import { createApiApp } from '../src/api/create-api-app.ts'
 import { generateTipsImage } from '../src/index.ts'
 
+const allowedCorsOrigin = 'https://allowed.example'
+const configuredCorsOrigins = parseCorsOrigins(`${allowedCorsOrigin},https://other.example`)
+const configuredCorsOriginsWithPaths = parseCorsOrigins(
+  `${allowedCorsOrigin}/nested/path?query=1,https://other.example/`,
+)
+const disallowedCorsOrigin = 'https://blocked.example'
 const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10]
 const { app } = createApiApp({
   apiVersion: packageJson.version,
@@ -10,6 +17,14 @@ const { app } = createApiApp({
     generateTipsImage,
   },
 })
+
+if (!configuredCorsOrigins) {
+  throw new Error('Expected configured CORS origins for API tests.')
+}
+
+if (!configuredCorsOriginsWithPaths) {
+  throw new Error('Expected normalized configured CORS origins for API tests.')
+}
 
 function createGenerateTipsQuery(entries: ReadonlyArray<readonly [string, string]>): string {
   const searchParams = new URLSearchParams()
@@ -28,6 +43,62 @@ test('api docs route returns Swagger UI HTML', async () => {
   expect(response.status).toBe(200)
   expect(response.headers.get('content-type')).toContain('text/html')
   expect(responseText).toContain('/api/openapi.json')
+})
+
+test('api index route omits CORS headers when origins are not configured', async () => {
+  const response = await app.request('/', {
+    headers: {
+      Origin: allowedCorsOrigin,
+    },
+  })
+
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull()
+})
+
+test('api index route returns CORS headers for allowed origins', async () => {
+  const response = await app.request(
+    '/',
+    {
+      headers: {
+        Origin: allowedCorsOrigin,
+      },
+    },
+    { corsOrigins: configuredCorsOrigins },
+  )
+
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Access-Control-Allow-Origin')).toBe(allowedCorsOrigin)
+})
+
+test('api index route matches normalized configured origins', async () => {
+  const response = await app.request(
+    '/',
+    {
+      headers: {
+        Origin: allowedCorsOrigin,
+      },
+    },
+    { corsOrigins: configuredCorsOriginsWithPaths },
+  )
+
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Access-Control-Allow-Origin')).toBe(allowedCorsOrigin)
+})
+
+test('api index route skips CORS headers for disallowed origins', async () => {
+  const response = await app.request(
+    '/',
+    {
+      headers: {
+        Origin: disallowedCorsOrigin,
+      },
+    },
+    { corsOrigins: configuredCorsOrigins },
+  )
+
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull()
 })
 
 test('api generate-tips route rejects blank tips', async () => {
@@ -94,6 +165,26 @@ test('api generate-tips route rejects too few tips', async () => {
   await expect(response.json()).resolves.toEqual({
     error: 'Provide between 3 and 7 tips.',
   })
+})
+
+test('api generate-tips route handles CORS preflight requests', async () => {
+  const response = await app.request(
+    '/api/generate-tips',
+    {
+      headers: {
+        'Access-Control-Request-Headers': 'x-custom-header, content-type',
+        'Access-Control-Request-Method': 'GET',
+        Origin: allowedCorsOrigin,
+      },
+      method: 'OPTIONS',
+    },
+    { corsOrigins: configuredCorsOrigins },
+  )
+
+  expect(response.status).toBe(204)
+  expect(response.headers.get('Access-Control-Allow-Headers')).toBe('x-custom-header,content-type')
+  expect(response.headers.get('Access-Control-Allow-Methods')).toBe('GET,HEAD,PUT,POST,DELETE,PATCH')
+  expect(response.headers.get('Access-Control-Allow-Origin')).toBe(allowedCorsOrigin)
 })
 
 test('api generate-tips route returns PNG bytes', async () => {
