@@ -54,6 +54,18 @@ If port `3000` is already in use, override it with `PORT`:
 PORT=3100 bun dev api
 ```
 
+Set `CORS_ORIGINS` to a comma-separated list of allowed origins to enable CORS. Leave it unset or blank to keep CORS disabled:
+
+```bash
+CORS_ORIGINS=https://app.example,https://studio.example bun dev api
+```
+
+For the Cloudflare Worker entrypoint, pass the same value through Wrangler:
+
+```bash
+bun x wrangler dev --config ./wrangler.jsonc --var CORS_ORIGINS:https://app.example,https://studio.example
+```
+
 Useful local URLs:
 
 - docs UI: [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
