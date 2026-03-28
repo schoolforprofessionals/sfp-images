@@ -32,6 +32,9 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Check built package
+        run: bun run check-built-package
+
       - name: Check package
         run: bun x publint
 

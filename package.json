@@ -70,8 +70,9 @@
   "scripts": {
     "build": "tsdown",
     "changeset": "changeset",
+    "check-built-package": "bun run ./test/check-built-package.ts",
     "check-types": "tsc -b --noEmit",
-    "ci": "bun run build && bun run lint && bun run check-types && bun test",
+    "ci": "bun run build && bun run check-built-package && bun run lint && bun run check-types && bun test",
     "dev": "bun run ./src/cli.ts",
     "lint": "biome check --error-on-warnings",
     "lint:fix": "biome check --error-on-warnings --write",
