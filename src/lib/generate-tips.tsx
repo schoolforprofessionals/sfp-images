@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Resvg } from '@resvg/resvg-js'
 import { type Font, parse } from 'opentype.js'
@@ -6,13 +8,38 @@ import { type GenerateTipsLabel, getLabelConfig } from '../labels.ts'
 
 const FONT_STYLE = 'normal'
 const FONT_WEIGHT = 400
+const IMAGE_FONT_SOURCE_FILE_NAME = 'ArchivoBlack-Regular.ttf'
+const IMAGE_FONT_SOURCE_PATH_SEGMENTS = ['assets', 'fonts', IMAGE_FONT_SOURCE_FILE_NAME] as const
+const PACKAGE_MANIFEST_FILE_NAME = 'package.json'
 const MAX_TIP_COUNT = 7
 const MIN_TIP_COUNT = 3
+
+function resolveImageFontSourcePath(): string {
+  let directoryPath = dirname(fileURLToPath(import.meta.url))
+
+  while (true) {
+    const candidatePath = join(directoryPath, ...IMAGE_FONT_SOURCE_PATH_SEGMENTS)
+
+    if (existsSync(candidatePath)) {
+      return candidatePath
+    }
+
+    const parentDirectoryPath = dirname(directoryPath)
+
+    if (parentDirectoryPath === directoryPath || existsSync(join(directoryPath, PACKAGE_MANIFEST_FILE_NAME))) {
+      break
+    }
+
+    directoryPath = parentDirectoryPath
+  }
+
+  throw new Error(`Could not locate ${IMAGE_FONT_SOURCE_FILE_NAME}.`)
+}
 
 export const ImageConfig = {
   font: {
     family: 'Archivo Black',
-    sourcePath: fileURLToPath(new URL('../../assets/fonts/ArchivoBlack-Regular.ttf', import.meta.url)),
+    sourcePath: resolveImageFontSourcePath(),
   },
   image: {
     height: 432,
